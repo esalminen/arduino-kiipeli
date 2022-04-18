@@ -20,27 +20,96 @@ JoystickInputs joystickInputs;
 const uint8_t xAxis = A0, yAxis = A1, buttonPin = 7;
 Joystick joystick(xAxis, yAxis, buttonPin, 100, 400);
 
-String rawTextSms = "";
-String textSms = "";
+String simRead = "";
 String numberSms = "";
+String textSms = "";
 bool messageArrived = false;
-bool messageReadyForLCD = false;
-bool initActive = true;
+bool messageParsed = false;
 
-void setup() {
-  // Start sim communication
-  sim.begin(9600);
-
+void setup() {  
   // LCD configuration no. of columns and rows
   lcd.begin(16,2);
-  lcd.print("hello, world!");
+  lcd.print("Initializing...");
+
+  // Start sim communication
+  sim.begin(9600);
+  delay(1000);
+
+  // Handshake test with Sim800L
+  sim.println("AT");
+  delay(500);
+  updateSimSerial();
+  lcd.clear();
+  lcd.print(String("Handshake: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
+  delay(3000);
+
+  // SMS-mode configuration
+  sim.println("AT+CMGF=1");
+  delay(500);
+  updateSimSerial();
+  lcd.clear();
+  lcd.print(String("Mode Config: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
+  delay(3000);
+
+  // SMS-receive configuration
+  sim.println("AT+CNMI=1,2,0,0,0");
+  delay(500);
+  updateSimSerial();
+  lcd.clear();
+  lcd.print(String("Rcv Config: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
+  delay(3000);
+
+  // Init completed
+  lcd.clear();
+  lcd.print("Init completed");
+  delay(3000);
+  lcd.clear();
 
   // Joystick setup
   joystick.begin();
+
+  // Reset messagearrived-flag from init messages
+  messageArrived = false;
 }
 
 void loop() {
   // Read joystick inputs
   joystickInputs = joystick.readInputs();
 
+  // Check sim messages
+  updateSimSerial();
+  if(messageArrived) parseMessage();
+  if(messageParsed) handleParsedMessage();
+  delay(500);
+
+}
+
+void updateSimSerial()
+{
+  if (sim.available())
+  {
+    simRead = "";
+    while (sim.available())
+    {
+      simRead += (char)sim.read();
+    }
+    messageArrived = true;
+  }
+}
+
+void parseMessage()
+{
+  numberSms = simRead.substring(9,22); // Get sender phonenumber from simRead string
+  textSms = simRead.substring(51, simRead.length() - 2); // Get sms message from simRead string
+  messageArrived = false;
+  messageParsed = true;
+}
+
+void handleParsedMessage()
+{
+  messageParsed = false;
+  lcd.clear();
+  lcd.print(numberSms);
+  lcd.setCursor(0,1);
+  lcd.print(textSms);
 }
