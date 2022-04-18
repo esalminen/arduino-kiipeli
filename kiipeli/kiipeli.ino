@@ -84,6 +84,9 @@ void loop() {
 
 }
 
+/**
+  Checks if there is any data in the sim-module buffer.
+*/
 void updateSimSerial()
 {
   if (sim.available())
@@ -97,6 +100,9 @@ void updateSimSerial()
   }
 }
 
+/**
+  Parses sms-sender number and sms-message to variables.
+*/
 void parseMessage()
 {
   numberSms = simRead.substring(9,22); // Get sender phonenumber from simRead string
@@ -105,6 +111,9 @@ void parseMessage()
   messageParsed = true;
 }
 
+/**
+  Handles parsed sms-message.
+*/
 void handleParsedMessage()
 {
   messageParsed = false;
