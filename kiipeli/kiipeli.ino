@@ -1,7 +1,11 @@
 #include <LiquidCrystal.h>
 #include <RGBLed.h>
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
 #include "Joystick.h"
+
+// Data structure for authorized numbers
+char authorizedNumbers[10][14];
 
 // LCD display 
 const uint8_t rs = 2, en = 4, d4 = 13, d5 = 12, d6 = 9, d7 = 8;
@@ -29,6 +33,15 @@ bool openSesame = false;
 long currentTime = 0;
 
 void setup() {  
+
+  // Read phonenumbers from EEPROM
+  EEPROM.get(0, authorizedNumbers);
+
+  Serial.begin(9600);
+  for(int i = 0; i < 10; i++)
+  {
+    Serial.println(authorizedNumbers[i]);  
+  }
 
   // LCD configuration no. of columns and rows
   lcd.begin(16,2);
@@ -120,6 +133,12 @@ void parseMessage()
 void handleParsedMessage()
 {
   messageParsed = false;
+  if(textSms.equals("123"))
+  {
+      char number[14];
+      numberSms.toCharArray(number, 14);
+      bool saved = addPhonenumberToList(number);
+  }
   lcd.clear();
   lcd.print(numberSms);
   lcd.setCursor(0,1);
@@ -148,4 +167,46 @@ void handleOpenSesame()
     currentTime = 0;
     openSesame = false;  
   }
+}
+
+/**
+  Saves phonenumber to EEPROM
+  @param char phonenumber[14] Phonenumber to be saved in EEPROM
+  @return true if number was saved to EEPROM. Otherwise false.
+*/
+bool addPhonenumberToList(char phonenumber[14])
+{
+   for(int i = 0; i < 10; i++)
+   {
+      String tempStr = authorizedNumbers[i];
+      String countryCode = tempStr.substring(0,4);
+      Serial.print("Countrycode: ");Serial.println(countryCode);
+      if(!countryCode.equals("+358"))
+      {
+        Serial.print("countryCode true when index ");
+        Serial.println(i);
+        strcpy(authorizedNumbers[i],phonenumber);
+        EEPROM.put(0, authorizedNumbers);
+        return true;
+      }
+   }
+   return false;
+}
+
+/**
+  Check if phoneNumber is int the authorized number list
+  @param char phonenumber[14] Phonenumber to be checked
+  @return true if number is authorized. Otherwise false.
+*/
+bool isPhonenumberOnTheList(String phonenumber)
+{
+    for(int i = 0; i < 10; i++)
+   {
+      String tempStr = authorizedNumbers[i];
+      if(tempStr.equals(phonenumber))
+      {
+        return true;
+      }
+   }
+   return false;
 }
