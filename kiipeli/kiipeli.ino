@@ -25,8 +25,11 @@ String numberSms = "";
 String textSms = "";
 bool messageArrived = false;
 bool messageParsed = false;
+bool openSesame = false;
+long currentTime = 0;
 
 void setup() {  
+
   // LCD configuration no. of columns and rows
   lcd.begin(16,2);
   lcd.print("Initializing...");
@@ -80,8 +83,8 @@ void loop() {
   updateSimSerial();
   if(messageArrived) parseMessage();
   if(messageParsed) handleParsedMessage();
-  delay(500);
-
+  if(openSesame) handleOpenSesame();
+  delay(100);
 }
 
 /**
@@ -121,4 +124,28 @@ void handleParsedMessage()
   lcd.print(numberSms);
   lcd.setCursor(0,1);
   lcd.print(textSms);
+  openSesame = true;
+}
+
+/**
+  Handles open sesame flag.
+*/
+void handleOpenSesame()
+{
+  if(!currentTime)
+  {
+    currentTime = millis();  
+  }
+
+  if(currentTime)
+  {
+    led.flash(RGBLed::YELLOW, 100, 100);   
+  }
+
+  if(millis() >= currentTime + 5000)
+  {
+    led.off();
+    currentTime = 0;
+    openSesame = false;  
+  }
 }
