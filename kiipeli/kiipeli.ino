@@ -48,7 +48,7 @@ void setup() {
   lcd.print("Initializing...");
 
   // Start sim communication
-  sim.begin(9600);
+  sim.begin(57600);
   delay(1000);
 
   // Handshake test with Sim800L
@@ -92,12 +92,21 @@ void loop() {
   // Read joystick inputs
   joystickInputs = joystick.readInputs();
 
+  // Debugging commands to sim from serial
+  if(Serial.available())
+  {
+    while(Serial.available())
+    {
+      sim.write(Serial.read());  
+    }  
+  }
+
   // Check sim messages
   updateSimSerial();
   if(messageArrived) parseMessage();
   if(messageParsed) handleParsedMessage();
   if(openSesame) handleOpenSesame();
-  delay(100);
+  delay(20);
 }
 
 /**
@@ -112,6 +121,7 @@ void updateSimSerial()
     {
       simRead += (char)sim.read();
     }
+    Serial.println(simRead);
     messageArrived = true;
   }
 }
@@ -120,9 +130,39 @@ void updateSimSerial()
   Parses sms-sender number and sms-message to variables.
 */
 void parseMessage()
-{
-  numberSms = simRead.substring(9,22); // Get sender phonenumber from simRead string
-  textSms = simRead.substring(51, simRead.length() - 2); // Get sms message from simRead string
+{ 
+  // ASCII Incoming sms: 131043677784583234435153565248545452544951493444343444345050474852474957445051584856584955434950341310751051051121011081051310
+  // CHAR  example       CRLF + C M T :   " + 3 5 8 4 0 6 6 4 6 1 3 1 " , " " , " 2 2 / 0 4 / 1 9 , 2 3 : 0 8 : 1 7 + 1 2 "CRLF K  i  i  p  e  l  iCRLF
+  
+  String tempStr = simRead;
+
+  // Find the beginning of sender phonenumber
+  int indexOfSeparator = tempStr.indexOf('"');
+  //Serial.println("ensimmainen lainausmerkki: " + (String)indexOfSeparator);
+
+  // Remove beginning before sender phonenumber
+  tempStr.remove(0, indexOfSeparator + 1);
+
+  // Find the end of sender phonenumber 
+  indexOfSeparator = tempStr.indexOf('"');
+  //Serial.println("toinen lainausmerkki: " + (String)indexOfSeparator);
+
+  // Save sender phonenumber to variable
+  numberSms = tempStr.substring(0,indexOfSeparator);
+  //Serial.print("Lahettaja: ");Serial.println(numberSms);
+
+  // Find beginning of sms from last quote
+  indexOfSeparator = tempStr.lastIndexOf('"');
+  //Serial.println("viimeinen lainausmerkki: " + (String)indexOfSeparator);
+  
+  // Remove string until the last quote + cr + lf
+  tempStr.remove(0, indexOfSeparator + 3);  
+  //Serial.println("jaljelle jai: " + tempStr);
+
+  // Copy remaining string without last two cr + lf chars
+  textSms = tempStr.substring(0, tempStr.length() - 2);
+  //Serial.println("sms: " + textSms);
+  
   messageArrived = false;
   messageParsed = true;
 }
