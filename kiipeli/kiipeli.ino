@@ -71,16 +71,23 @@ void setup() {
   // LCD configuration no. of columns and rows
   lcd.begin(16,2);
   analogWrite(contrast, contrastSetting); // set contrast of the lcd
-  lcd.print("Initializing...");
+  lcd.print("Wake sim800...");
 
   // Start sim communication
   sim.begin(57600);
-  delay(3000);
+  delay(1000);
 
   // Handshake test with Sim800L
-  sim.println("AT");
-  delay(500);
-  updateSimSerial();
+  String testResult = "";
+  while(!testResult.equals("OK"))
+  {
+    sim.println("AT");
+    delay(500);
+    updateSimSerial();
+    testResult = simRead.substring(simRead.length()-4, simRead.length()-2);
+    delay(1000);
+  }
+  
   lcd.clear();
   lcd.print(String("Handshake: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
   delay(1000);
@@ -125,8 +132,8 @@ void loop() {
   bitWrite(inputs, 3, joystickInputs.right);
   bitWrite(inputs, 4, joystickInputs.buttonPressed);  
 
-  // Make AND operation to detect change in inputs for 1 cycle
-  pulseInputs = inputs & prevInputs;
+  // Make AND operation with prev complement to detect positive change in inputs for 1 cycle
+  pulseInputs = inputs & ~prevInputs;
     
   // Debugging commands to sim from serial
   #ifdef DEBUG  
@@ -207,7 +214,8 @@ void parseMessage()
   // Copy remaining string without last two cr + lf chars
   textSms = tempStr.substring(0, tempStr.length() - 2);
   DEBUG_PRINT("sms: " + textSms);
-  
+
+  // Turn flags accordingly
   messageArrived = false;
   messageParsed = true;
 }
