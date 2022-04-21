@@ -138,10 +138,6 @@ void loop() {
   if(openSesame) handleFlag(openSesame, 1);
   if(authorizeNumberSms) handleFlag(authorizeNumberSms, 2);
   if(unauthorizedSms) handleFlag(unauthorizedSms, 3);
-  
-  //if(openSesame) handleOpenSesame();
-  //if(authorizeNumberSms) handleAuthorizeSms();
-  //if(unauthorizedSms) handleUnauthorizedSms();
   delay(20);
 }
 
