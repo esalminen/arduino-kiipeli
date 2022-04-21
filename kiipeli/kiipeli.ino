@@ -262,6 +262,7 @@ void handleFlag(bool &flag, int ledColor)
   if(millis() >= currentTime + 5000)
   {
     led.off();
+    lcd.clear();
     currentTime = 0;
     flag = false;  
   }
