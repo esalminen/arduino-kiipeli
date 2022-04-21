@@ -4,6 +4,14 @@
 #include <EEPROM.h>
 #include "Joystick.h"
 
+//#define DEBUG
+
+#ifdef DEBUG
+  #define DEBUG_PRINT(x)  Serial.println (x)
+#else
+  #define DEBUG_PRINT(x)
+#endif
+
 // Data structure for authorized numbers
 char authorizedNumbers[10][14];
 
@@ -24,23 +32,43 @@ JoystickInputs joystickInputs;
 const uint8_t xAxis = A0, yAxis = A1, buttonPin = 7;
 Joystick joystick(xAxis, yAxis, buttonPin, 100, 400);
 
+// String storages
 String simRead = "";
 String numberSms = "";
 String textSms = "";
+
+// String commands
+String openKeySmsCmd = "Kiipeli";
+String registerKeyCmd = "abc123";
+String clearEEPROMCmd = "clrEEPROM";
+
+// Case flags
 bool messageArrived = false;
 bool messageParsed = false;
 bool openSesame = false;
+bool unauthorizedSms = false;
+bool authorizeNumberSms = false;
+
+// Time var
 long currentTime = 0;
 
-void setup() {  
-
+void setup() {
+  
   // Read phonenumbers from EEPROM
   EEPROM.get(0, authorizedNumbers);
 
-  Serial.begin(9600);
+  // Activate serial transmitting in debug mode
+  #ifdef DEBUG
+    Serial.begin(9600);
+    for(int i = 0; i < 10; i++)
+    {
+      DEBUG_PRINT(authorizedNumbers[i]);  
+    }
+  #endif
+
   for(int i = 0; i < 10; i++)
   {
-    Serial.println(authorizedNumbers[i]);  
+    DEBUG_PRINT(authorizedNumbers[i]);  
   }
 
   // LCD configuration no. of columns and rows
@@ -49,7 +77,7 @@ void setup() {
 
   // Start sim communication
   sim.begin(57600);
-  delay(1000);
+  delay(3000);
 
   // Handshake test with Sim800L
   sim.println("AT");
@@ -105,7 +133,13 @@ void loop() {
   updateSimSerial();
   if(messageArrived) parseMessage();
   if(messageParsed) handleParsedMessage();
-  if(openSesame) handleOpenSesame();
+  if(openSesame) handleFlag(openSesame, 1);
+  if(authorizeNumberSms) handleFlag(authorizeNumberSms, 2);
+  if(unauthorizedSms) handleFlag(unauthorizedSms, 3);
+  
+  //if(openSesame) handleOpenSesame();
+  //if(authorizeNumberSms) handleAuthorizeSms();
+  //if(unauthorizedSms) handleUnauthorizedSms();
   delay(20);
 }
 
@@ -121,7 +155,7 @@ void updateSimSerial()
     {
       simRead += (char)sim.read();
     }
-    Serial.println(simRead);
+    DEBUG_PRINT(simRead);
     messageArrived = true;
   }
 }
@@ -138,30 +172,30 @@ void parseMessage()
 
   // Find the beginning of sender phonenumber
   int indexOfSeparator = tempStr.indexOf('"');
-  //Serial.println("ensimmainen lainausmerkki: " + (String)indexOfSeparator);
+  DEBUG_PRINT("first quote: " + (String)indexOfSeparator);
 
   // Remove beginning before sender phonenumber
   tempStr.remove(0, indexOfSeparator + 1);
 
   // Find the end of sender phonenumber 
   indexOfSeparator = tempStr.indexOf('"');
-  //Serial.println("toinen lainausmerkki: " + (String)indexOfSeparator);
+  DEBUG_PRINT("second quote: " + (String)indexOfSeparator);
 
   // Save sender phonenumber to variable
   numberSms = tempStr.substring(0,indexOfSeparator);
-  //Serial.print("Lahettaja: ");Serial.println(numberSms);
+  DEBUG_PRINT("Sender: ");Serial.println(numberSms);
 
   // Find beginning of sms from last quote
   indexOfSeparator = tempStr.lastIndexOf('"');
-  //Serial.println("viimeinen lainausmerkki: " + (String)indexOfSeparator);
+  DEBUG_PRINT("last quote: " + (String)indexOfSeparator);
   
   // Remove string until the last quote + cr + lf
   tempStr.remove(0, indexOfSeparator + 3);  
-  //Serial.println("jaljelle jai: " + tempStr);
+  DEBUG_PRINT("remainder text: " + tempStr);
 
   // Copy remaining string without last two cr + lf chars
   textSms = tempStr.substring(0, tempStr.length() - 2);
-  //Serial.println("sms: " + textSms);
+  DEBUG_PRINT("sms: " + textSms);
   
   messageArrived = false;
   messageParsed = true;
@@ -173,63 +207,95 @@ void parseMessage()
 void handleParsedMessage()
 {
   messageParsed = false;
-  if(textSms.equals("123"))
-  {
-      char number[14];
-      numberSms.toCharArray(number, 14);
-      bool saved = addPhonenumberToList(number);
-  }
   lcd.clear();
   lcd.print(numberSms);
   lcd.setCursor(0,1);
   lcd.print(textSms);
-  openSesame = true;
+  
+  if(textSms.equals(registerKeyCmd))
+  {
+      char number[14];
+      numberSms.toCharArray(number, 14);
+      authorizeNumberSms = addPhonenumberToList(number);
+  }
+  else if(isPhonenumberOnTheList(numberSms) && textSms.equals(openKeySmsCmd))
+  {
+      openSesame = true;
+  }
+  else if(isPhonenumberOnTheList(numberSms) && textSms.equals(clearEEPROMCmd))
+  {
+      clearEEPROM();
+  }
+  else if(!authorizeNumberSms)
+  {
+      unauthorizedSms = true;
+  }
 }
 
 /**
-  Handles open sesame flag.
+  Handles event flag.
+  @param bool &flag passed value by reference flag
+  @param int ledColor 1=Green, 2=Yellow, 3=Red
 */
-void handleOpenSesame()
+void handleFlag(bool &flag, int ledColor)
 {
   if(!currentTime)
   {
-    currentTime = millis();  
+    currentTime = millis(); 
   }
-
   if(currentTime)
   {
-    led.flash(RGBLed::YELLOW, 100, 100);   
+    switch(ledColor)
+    {
+      case 1:
+        led.flash(RGBLed::GREEN, 100, 100);
+        break;
+      case 2:
+        led.flash(RGBLed::YELLOW, 100, 100);
+        break;  
+      case 3:
+        led.flash(RGBLed::RED, 100, 100);
+        break; 
+      default:
+        break;
+    }  
   }
 
   if(millis() >= currentTime + 5000)
   {
     led.off();
     currentTime = 0;
-    openSesame = false;  
+    flag = false;  
   }
 }
 
 /**
   Saves phonenumber to EEPROM
   @param char phonenumber[14] Phonenumber to be saved in EEPROM
-  @return true if number was saved to EEPROM. Otherwise false.
+  @return true if number was saved to EEPROM or is already on the EEPROM.
 */
 bool addPhonenumberToList(char phonenumber[14])
 {
+   if(isPhonenumberOnTheList((String)phonenumber))
+   {
+      DEBUG_PRINT("Phonenumber " + (String)phonenumber + " was on the list. Not saved.");
+      return true;
+   }
    for(int i = 0; i < 10; i++)
    {
       String tempStr = authorizedNumbers[i];
       String countryCode = tempStr.substring(0,4);
-      Serial.print("Countrycode: ");Serial.println(countryCode);
+      DEBUG_PRINT("Countrycode: " + (String)countryCode);
       if(!countryCode.equals("+358"))
       {
-        Serial.print("countryCode true when index ");
-        Serial.println(i);
+        DEBUG_PRINT("countryCode true when index " + String(i));
         strcpy(authorizedNumbers[i],phonenumber);
         EEPROM.put(0, authorizedNumbers);
+        DEBUG_PRINT("Phonenumber was saved to index " + (String)i);
         return true;
       }
    }
+   DEBUG_PRINT("Phonebook full. Number was not saved");
    return false;
 }
 
@@ -249,4 +315,20 @@ bool isPhonenumberOnTheList(String phonenumber)
       }
    }
    return false;
+}
+
+/**
+  Fills phonebook in the EEPROM with zeroes
+*/
+void clearEEPROM()
+{
+    char emptyArray[10][14];
+    for(int i = 0; i < 10; i++)
+    {
+      for(int j = 0; j < 14;j++)
+      {
+        emptyArray[i][j] = 0;  
+      }
+    }
+    EEPROM.put(0, emptyArray);
 }
