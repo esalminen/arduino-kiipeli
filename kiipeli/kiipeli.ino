@@ -121,6 +121,7 @@ void loop() {
   joystickInputs = joystick.readInputs();
 
   // Debugging commands to sim from serial
+  #ifdef DEBUG  
   if(Serial.available())
   {
     while(Serial.available())
@@ -128,6 +129,7 @@ void loop() {
       sim.write(Serial.read());  
     }  
   }
+  #endif
 
   // Check sim messages
   updateSimSerial();
