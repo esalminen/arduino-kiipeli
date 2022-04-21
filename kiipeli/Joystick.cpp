@@ -27,7 +27,7 @@ void Joystick::begin()
 JoystickInputs Joystick::readInputs()
 {
   // Read button state
-  _joystickInputs.buttonPressed = !digitalRead(_buttonPin);
+  _joystickInputs.buttonPressed = analogRead(_buttonPin) <= _axisLowLimit;
 
   // Map joystick analog signals
   int leftRight = map(analogRead(_xAxisPin), 0, 1023, -512, 512);

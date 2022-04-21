@@ -4,7 +4,7 @@
 #include <EEPROM.h>
 #include "Joystick.h"
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
   #define DEBUG_PRINT(x)  Serial.println (x)
@@ -16,20 +16,22 @@
 char authorizedNumbers[10][14];
 
 // LCD display 
-const uint8_t rs = 2, en = 4, d4 = 13, d5 = 12, d6 = 9, d7 = 8;
+const uint8_t rs = 12, en = 13, d4 = 5, d5 = 6, d6 = 7, d7 = 8, contrast = 3;
+const uint8_t contrastSetting = 125;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // RGB led
-const uint8_t ledRedPin = 3, ledGreenPin = 5, ledBluePin = 6;
+const uint8_t ledRedPin = 9, ledGreenPin = 10, ledBluePin = 11;
 RGBLed led(ledRedPin, ledGreenPin, ledBluePin, RGBLed::COMMON_CATHODE);
 
 // Sim800L
-const uint8_t rx = 10, tx = 11;
-SoftwareSerial sim(10, 11);
+const uint8_t rx = 2, tx = 4;
+SoftwareSerial sim(rx, tx);
 
 // Joystick
 JoystickInputs joystickInputs;
-const uint8_t xAxis = A0, yAxis = A1, buttonPin = 7;
+byte inputs = 0, prevInputs = 0, pulseInputs = 0;
+const uint8_t xAxis = A0, yAxis = A1, buttonPin = A2;
 Joystick joystick(xAxis, yAxis, buttonPin, 100, 400);
 
 // String storages
@@ -66,13 +68,9 @@ void setup() {
     }
   #endif
 
-  for(int i = 0; i < 10; i++)
-  {
-    DEBUG_PRINT(authorizedNumbers[i]);  
-  }
-
   // LCD configuration no. of columns and rows
   lcd.begin(16,2);
+  analogWrite(contrast, contrastSetting); // set contrast of the lcd
   lcd.print("Initializing...");
 
   // Start sim communication
@@ -85,7 +83,7 @@ void setup() {
   updateSimSerial();
   lcd.clear();
   lcd.print(String("Handshake: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
-  delay(3000);
+  delay(1000);
 
   // SMS-mode configuration
   sim.println("AT+CMGF=1");
@@ -93,7 +91,7 @@ void setup() {
   updateSimSerial();
   lcd.clear();
   lcd.print(String("Mode Config: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
-  delay(3000);
+  delay(1000);
 
   // SMS-receive configuration
   sim.println("AT+CNMI=1,2,0,0,0");
@@ -101,12 +99,12 @@ void setup() {
   updateSimSerial();
   lcd.clear();
   lcd.print(String("Rcv Config: " + simRead.substring(simRead.length()-4, simRead.length()-2)));
-  delay(3000);
+  delay(1000);
 
   // Init completed
   lcd.clear();
   lcd.print("Init completed");
-  delay(3000);
+  delay(1000);
   lcd.clear();
 
   // Joystick setup
@@ -120,6 +118,16 @@ void loop() {
   // Read joystick inputs
   joystickInputs = joystick.readInputs();
 
+  // Copy inputs to byte bit by bit
+  bitWrite(inputs, 0, joystickInputs.up);
+  bitWrite(inputs, 1, joystickInputs.down);
+  bitWrite(inputs, 2, joystickInputs.left);
+  bitWrite(inputs, 3, joystickInputs.right);
+  bitWrite(inputs, 4, joystickInputs.buttonPressed);  
+
+  // Make AND operation to detect change in inputs for 1 cycle
+  pulseInputs = inputs & prevInputs;
+    
   // Debugging commands to sim from serial
   #ifdef DEBUG  
   if(Serial.available())
@@ -138,6 +146,9 @@ void loop() {
   if(openSesame) handleFlag(openSesame, 1);
   if(authorizeNumberSms) handleFlag(authorizeNumberSms, 2);
   if(unauthorizedSms) handleFlag(unauthorizedSms, 3);
+
+  // Write this cycle joystick inputs to memory
+  prevInputs = inputs;
   delay(20);
 }
 
@@ -163,9 +174,11 @@ void updateSimSerial()
 */
 void parseMessage()
 { 
+  // Incoming message looks like following in ASCII numbers and letters:
   // ASCII Incoming sms: 131043677784583234435153565248545452544951493444343444345050474852474957445051584856584955434950341310751051051121011081051310
   // CHAR  example       CRLF + C M T :   " + 3 5 8 4 0 6 6 4 6 1 3 1 " , " " , " 2 2 / 0 4 / 1 9 , 2 3 : 0 8 : 1 7 + 1 2 "CRLF K  i  i  p  e  l  iCRLF
-  
+
+  // Save to temp variable
   String tempStr = simRead;
 
   // Find the beginning of sender phonenumber
@@ -247,12 +260,15 @@ void handleFlag(bool &flag, int ledColor)
     {
       case 1:
         led.flash(RGBLed::GREEN, 100, 100);
+        DEBUG_PRINT("Led green");
         break;
       case 2:
         led.flash(RGBLed::YELLOW, 100, 100);
+        DEBUG_PRINT("Led yellow");
         break;  
       case 3:
         led.flash(RGBLed::RED, 100, 100);
+        DEBUG_PRINT("Led red");
         break; 
       default:
         break;
