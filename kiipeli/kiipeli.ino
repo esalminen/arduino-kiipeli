@@ -17,15 +17,15 @@
 char authorizedNumbers[10][14];
 
 // Data structure for key drops. Number and timestamp is saved
-char keyDropEvents[10][32];
+char keyDropEvents[10][28];
 
 // LCD display
 const uint8_t rs = 12, en = 13, d4 = 5, d5 = 6, d6 = 7, d7 = 8, contrast = 3;
-const uint8_t contrastSetting = 125;
+uint8_t contrastSetting = 110;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // LCD Menu
-enum Menu 
+enum States 
 {
   Wait_0,
   SavedNumbers_1,
@@ -36,7 +36,7 @@ enum Menu
   JoystickTest_3_1  
 };
 
-Menu menu = Wait_0;
+States menu = Wait_0;
 uint8_t menuIndex = 0;
 
 // RGB led
@@ -56,6 +56,7 @@ Joystick joystick(xAxis, yAxis, buttonPin, 100, 400);
 String simRead = "";
 String numberSms = "";
 String textSms = "";
+String dateSms = "";
 
 // String commands
 String openKeySmsCmd = "Kiipeli";
@@ -76,6 +77,9 @@ void setup() {
 
   // Read phonenumbers from EEPROM
   EEPROM.get(0, authorizedNumbers);
+
+  // Read keydrop events from EEPROM
+  EEPROM.get(140, keyDropEvents);
 
   // Activate serial transmitting in debug mode
 #ifdef DEBUG
@@ -173,7 +177,6 @@ void loop() {
   switch(menu)
   {
     case Wait_0:
-      lcd.clear();
       if(joystickInputs.buttonPressed) menu = SavedNumbers_1;
       break;
       
@@ -182,8 +185,16 @@ void loop() {
       lcd.print("1. Saved numbers");
       if(joystickInputs.up) menu = Testing_3;
       if(joystickInputs.down) menu = KeyDrops_2;
-      if(joystickInputs.right) menu = BrowseNumber_1_1;
-      if(joystickInputs.left) menu = Wait_0;
+      if(joystickInputs.left)
+      {
+        lcd.clear();
+        menu = Wait_0;  
+      }
+      if(joystickInputs.right) 
+      {
+        menuIndex = 0; 
+        menu = BrowseNumber_1_1; 
+      }
       break;
       
     case BrowseNumber_1_1:
@@ -211,12 +222,43 @@ void loop() {
       lcd.print("2. Keydrops");
       if(joystickInputs.up) menu = SavedNumbers_1;
       if(joystickInputs.down) menu = Testing_3;
-      if(joystickInputs.left) menu = Wait_0;
+      if(joystickInputs.left)
+      {
+        lcd.clear();
+        menu = Wait_0;  
+      }
+      if(joystickInputs.right)
+      {
+        menuIndex = 0;
+        menu = BrowseKeyDrops_2_1;
+      }
       break;
       
     case BrowseKeyDrops_2_1:
       lcd.clear();
-      lcd.print("");
+      lcd.print(menuIndex + 1);
+      lcd.print(":");
+      for(int i = 0; i < 13; i++)
+      {
+        lcd.print(keyDropEvents[menuIndex][i]);  
+      }
+      lcd.setCursor(0,1);
+      lcd.print("  ");
+      for(int i = 13; i < 27; i++)
+      {
+        lcd.print(keyDropEvents[menuIndex][i]);  
+      }
+      if(joystickInputs.up)
+      {
+        if(menuIndex == 0) menuIndex = 9;
+        else menuIndex--;
+      };
+      if(joystickInputs.down)
+      {
+        if(menuIndex == 9) menuIndex = 0;
+        else menuIndex++;
+      };
+      if(joystickInputs.left) menu = KeyDrops_2;
       break;
       
     case Testing_3:
@@ -224,12 +266,42 @@ void loop() {
       lcd.print("3. Testing");
       if(joystickInputs.up) menu = KeyDrops_2;
       if(joystickInputs.down) menu = SavedNumbers_1;
-      if(joystickInputs.left) menu = Wait_0;
+      if(joystickInputs.left)
+      {
+        lcd.clear();
+        menu = Wait_0;  
+      }
+      if(joystickInputs.right) menu = JoystickTest_3_1;
       break;
       
     case JoystickTest_3_1:
       lcd.clear();
-      lcd.print("");
+      lcd.print("U/D:lcd, R:open");
+      lcd.setCursor(0,1);
+      lcd.print("lcd:" + String(contrastSetting) + " B:led");
+      if(joystickInputs.up)
+      {
+        contrastSetting++;
+        analogWrite(contrast, contrastSetting);
+      }
+      if(joystickInputs.down)
+      {
+        contrastSetting--;
+        analogWrite(contrast, contrastSetting);
+      }
+      if(joystickInputs.left) menu = Testing_3;
+      if(joystickInputs.buttonPressed)
+      {
+        led.setColor(RGBLed::RED);
+        delay(1000);
+        led.setColor(RGBLed::GREEN);
+        delay(1000);
+        led.setColor(RGBLed::BLUE);
+        delay(1000);
+        led.setColor(RGBLed::WHITE);
+        delay(1000);
+        led.off();  
+      };
       break;
     default:
       break; 
@@ -276,26 +348,29 @@ void parseMessage()
 
   // Find the beginning of sender phonenumber
   int indexOfSeparator = tempStr.indexOf('"');
-  DEBUG_PRINT("first quote: " + (String)indexOfSeparator);
 
   // Remove beginning before sender phonenumber
   tempStr.remove(0, indexOfSeparator + 1);
 
   // Find the end of sender phonenumber
   indexOfSeparator = tempStr.indexOf('"');
-  DEBUG_PRINT("second quote: " + (String)indexOfSeparator);
 
   // Save sender phonenumber to variable
   numberSms = tempStr.substring(0, indexOfSeparator);
   DEBUG_PRINT("Sender: "); Serial.println(numberSms);
 
+  // Find beginning of timestamp from "/" and subtract 2 to get beginning of the timestamp
+  indexOfSeparator = tempStr.indexOf('/');
+  indexOfSeparator -= 2;
+  tempStr.remove(0, indexOfSeparator);
+  dateSms = tempStr.substring(0, 14); // Date value is 14 chars long excluding seconds
+  DEBUG_PRINT("Date: "); Serial.println(dateSms);
+
   // Find beginning of sms from last quote
   indexOfSeparator = tempStr.lastIndexOf('"');
-  DEBUG_PRINT("last quote: " + (String)indexOfSeparator);
 
   // Remove string until the last quote + cr + lf
   tempStr.remove(0, indexOfSeparator + 3);
-  DEBUG_PRINT("remainder text: " + tempStr);
 
   // Copy remaining string without last two cr + lf chars
   textSms = tempStr.substring(0, tempStr.length() - 2);
@@ -354,15 +429,12 @@ void handleFlag(bool &flag, int ledColor)
     {
       case 1:
         led.flash(RGBLed::GREEN, 100, 100);
-        DEBUG_PRINT("Led green");
         break;
       case 2:
         led.flash(RGBLed::YELLOW, 100, 100);
-        DEBUG_PRINT("Led yellow");
         break;
       case 3:
         led.flash(RGBLed::RED, 100, 100);
-        DEBUG_PRINT("Led red");
         break;
       default:
         break;
@@ -394,7 +466,6 @@ bool addPhonenumberToList(char phonenumber[14])
   {
     String tempStr = authorizedNumbers[i];
     String countryCode = tempStr.substring(0, 4);
-    DEBUG_PRINT("Countrycode: " + (String)countryCode);
     
     // To handle un-initialized EEPROM memory. If we find char array starting with 
     // Finnish country code it is most propably a valid number and not some gibberish
