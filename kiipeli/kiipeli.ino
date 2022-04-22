@@ -17,7 +17,7 @@
 char authorizedNumbers[10][14];
 
 // Data structure for key drops. Number and timestamp is saved
-char keyDropEvents[10][28];
+char keyDropEvents[10][30];
 
 // LCD display
 const uint8_t rs = 12, en = 13, d4 = 5, d5 = 6, d6 = 7, d7 = 8, contrast = 3;
@@ -25,7 +25,7 @@ uint8_t contrastSetting = 110;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // LCD Menu
-enum States 
+enum MenusStates 
 {
   Wait_0,
   SavedNumbers_1,
@@ -36,7 +36,7 @@ enum States
   JoystickTest_3_1  
 };
 
-States menu = Wait_0;
+MenusStates menu = Wait_0;
 uint8_t menuIndex = 0;
 
 // RGB led
@@ -88,6 +88,12 @@ void setup() {
   for (int i = 0; i < 10; i++)
   {
     DEBUG_PRINT(authorizedNumbers[i]);
+  }
+
+  DEBUG_PRINT("Keydrop events list:");
+  for (int i = 0; i < 10; i++)
+  {
+    DEBUG_PRINT(keyDropEvents[i]);
   }
 #endif
 
@@ -157,6 +163,11 @@ void setup() {
   // Reset messagearrived-flag from init messages
   messageArrived = false;
 }
+
+/*
+ * Arduino software reset function
+ */
+void(* resetFunc) (void) = 0;
 
 void loop() {
   // Read joystick inputs
@@ -237,17 +248,12 @@ void loop() {
     case BrowseKeyDrops_2_1:
       lcd.clear();
       lcd.print(menuIndex + 1);
-      lcd.print(":");
-      for(int i = 0; i < 13; i++)
-      {
-        lcd.print(keyDropEvents[menuIndex][i]);  
-      }
-      lcd.setCursor(0,1);
-      lcd.print("  ");
-      for(int i = 13; i < 27; i++)
-      {
-        lcd.print(keyDropEvents[menuIndex][i]);  
-      }
+//      lcd.print(":");
+//      String tempEvents = keyDropEvents[menuIndex];
+//      lcd.print(tempEvents.substring(0,13));
+//      lcd.setCursor(0,1);
+//      lcd.print(" ");
+//      lcd.print(tempEvents.substring(13));
       if(joystickInputs.up)
       {
         if(menuIndex == 0) menuIndex = 9;
@@ -401,9 +407,16 @@ void handleParsedMessage()
   else if (isPhonenumberOnTheList(numberSms) && textSms.equals(openKeySmsCmd))
   {
     openSesame = true;
+    String temp = numberSms + ":" + dateSms;
+    char tempCharArray[30];
+    temp.toCharArray(tempCharArray, 30);
+    DEBUG_PRINT("Adding event from keydrop: " + temp);
+    addKeydropEventToList(tempCharArray);   
   }
   else if (isPhonenumberOnTheList(numberSms) && textSms.equals(clearEEPROMCmd))
   {
+    // Clear EEPROM
+    DEBUG_PRINT("Starting to clear EEPROM.");
     clearEEPROM();
   }
   else if (!authorizeNumberSms)
@@ -501,17 +514,39 @@ bool isPhonenumberOnTheList(String phonenumber)
 }
 
 /**
-  Fills phonebook in the EEPROM with zeroes
+  Saves keydrop event to EEPROM
+  @param char eventInfo[28] Event to be saved in EEPROM
+  @return true if event was saved to EEPROM
+*/
+bool addKeydropEventToList(char eventInfo[28])
+{
+  for (int i = 0; i < 10; i++)
+  {    
+    String tempStr = keyDropEvents[i];
+    String countryCode = tempStr.substring(0, 4);
+    // To handle un-initialized EEPROM memory. If we find char array starting with 
+    // Finnish country code it is most propably a valid number and not some gibberish
+    if (!countryCode.equals("+358")) 
+    {
+      DEBUG_PRINT("Event saved to index " + String(i));
+      strcpy(keyDropEvents[i], eventInfo);
+      EEPROM.put(140, keyDropEvents);
+      return true;
+    }
+  }
+  DEBUG_PRINT("Eventlist full. Event was not saved");
+  return false;
+}
+
+/**
+  Fills EEPROM area with zeros
 */
 void clearEEPROM()
 {
-  char emptyArray[10][14];
-  for (int i = 0; i < 10; i++)
+  for(int i = 0; i < EEPROM.length();i++)
   {
-    for (int j = 0; j < 14; j++)
-    {
-      emptyArray[i][j] = 0;
-    }
+    EEPROM.write(i,0);  
   }
-  EEPROM.put(0, emptyArray);
+  DEBUG_PRINT("EEPROM filled with zeroes, resetting Arduino");
+  resetFunc();
 }
