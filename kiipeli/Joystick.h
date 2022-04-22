@@ -13,12 +13,14 @@ struct JoystickInputs {
 };
 
 class Joystick {
+    byte inputs = 0, prevInputs = 0, pulseInputs = 0;
     int _xAxisPin = 0;
     int _yAxisPin = 0;
     int _buttonPin = 0;
     int _axisLowLimit = 0;
     int _axisHighLimit = 0;
     JoystickInputs _joystickInputs;
+    JoystickInputs _returnInputs;
 
 
   public:
