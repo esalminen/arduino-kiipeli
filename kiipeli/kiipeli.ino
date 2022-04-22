@@ -43,4 +43,223 @@ void loop() {
   // Read joystick inputs
   joystickInputs = joystick.readInputs();
 
+  // Debugging commands to sim from serial
+#ifdef DEBUG
+  if (Serial.available())
+  {
+    while (Serial.available())
+    {
+      sim.write(Serial.read());
+    }
+  }
+#endif
+
+  // Check sim messages
+  updateSimSerial();
+  if (messageArrived) parseMessage();
+  if (messageParsed) handleParsedMessage();
+  if (openSesame) handleFlag(openSesame, 1);
+  if (authorizeNumberSms) handleFlag(authorizeNumberSms, 2);
+  if (unauthorizedSms) handleFlag(unauthorizedSms, 3);
+  delay(20);
+}
+
+/**
+  Checks if there is any data in the sim-module buffer.
+*/
+void updateSimSerial()
+{
+  if (sim.available())
+  {
+    simRead = "";
+    while (sim.available())
+    {
+      simRead += (char)sim.read();
+    }
+    DEBUG_PRINT(simRead);
+    messageArrived = true;
+  }
+}
+
+/**
+  Parses sms-sender number and sms-message to variables.
+*/
+void parseMessage()
+{
+  // Incoming message looks like following in ASCII numbers and letters:
+  // ASCII Incoming sms: 131043677784583234435153565248545452544951493444343444345050474852474957445051584856584955434950341310751051051121011081051310
+  // CHAR  example       CRLF + C M T :   " + 3 5 8 4 0 6 6 4 6 1 3 1 " , " " , " 2 2 / 0 4 / 1 9 , 2 3 : 0 8 : 1 7 + 1 2 "CRLF K  i  i  p  e  l  iCRLF
+
+  // Save to temp variable
+  String tempStr = simRead;
+
+  // Find the beginning of sender phonenumber
+  int indexOfSeparator = tempStr.indexOf('"');
+  DEBUG_PRINT("first quote: " + (String)indexOfSeparator);
+
+  // Remove beginning before sender phonenumber
+  tempStr.remove(0, indexOfSeparator + 1);
+
+  // Find the end of sender phonenumber
+  indexOfSeparator = tempStr.indexOf('"');
+  DEBUG_PRINT("second quote: " + (String)indexOfSeparator);
+
+  // Save sender phonenumber to variable
+  numberSms = tempStr.substring(0, indexOfSeparator);
+  DEBUG_PRINT("Sender: "); Serial.println(numberSms);
+
+  // Find beginning of sms from last quote
+  indexOfSeparator = tempStr.lastIndexOf('"');
+  DEBUG_PRINT("last quote: " + (String)indexOfSeparator);
+
+  // Remove string until the last quote + cr + lf
+  tempStr.remove(0, indexOfSeparator + 3);
+  DEBUG_PRINT("remainder text: " + tempStr);
+
+  // Copy remaining string without last two cr + lf chars
+  textSms = tempStr.substring(0, tempStr.length() - 2);
+  DEBUG_PRINT("sms: " + textSms);
+
+  // Turn flags accordingly
+  messageArrived = false;
+  messageParsed = true;
+}
+
+/**
+  Handles parsed sms-message.
+*/
+void handleParsedMessage()
+{
+  messageParsed = false;
+  lcd.clear();
+  lcd.print(numberSms);
+  lcd.setCursor(0, 1);
+  lcd.print(textSms);
+
+  if (textSms.equals(registerKeyCmd))
+  {
+    char number[14];
+    numberSms.toCharArray(number, 14);
+    authorizeNumberSms = addPhonenumberToList(number);
+  }
+  else if (isPhonenumberOnTheList(numberSms) && textSms.equals(openKeySmsCmd))
+  {
+    openSesame = true;
+  }
+  else if (isPhonenumberOnTheList(numberSms) && textSms.equals(clearEEPROMCmd))
+  {
+    clearEEPROM();
+  }
+  else if (!authorizeNumberSms)
+  {
+    unauthorizedSms = true;
+  }
+}
+
+/**
+  Handles event flag.
+  @param bool &flag passed value by reference flag
+  @param int ledColor 1=Green, 2=Yellow, 3=Red
+*/
+void handleFlag(bool &flag, int ledColor)
+{
+  if (!currentTime)
+  {
+    currentTime = millis();
+  }
+  if (currentTime)
+  {
+    switch (ledColor)
+    {
+      case 1:
+        led.flash(RGBLed::GREEN, 100, 100);
+        DEBUG_PRINT("Led green");
+        break;
+      case 2:
+        led.flash(RGBLed::YELLOW, 100, 100);
+        DEBUG_PRINT("Led yellow");
+        break;
+      case 3:
+        led.flash(RGBLed::RED, 100, 100);
+        DEBUG_PRINT("Led red");
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (millis() >= currentTime + 5000)
+  {
+    led.off();
+    lcd.clear();
+    currentTime = 0;
+    flag = false;
+  }
+}
+
+/**
+  Saves phonenumber to EEPROM
+  @param char phonenumber[14] Phonenumber to be saved in EEPROM
+  @return true if number was saved to EEPROM or is already on the EEPROM.
+*/
+bool addPhonenumberToList(char phonenumber[14])
+{
+  if (isPhonenumberOnTheList((String)phonenumber))
+  {
+    DEBUG_PRINT("Phonenumber " + (String)phonenumber + " was on the list. Not saved.");
+    return true;
+  }
+  for (int i = 0; i < 10; i++)
+  {
+    String tempStr = authorizedNumbers[i];
+    String countryCode = tempStr.substring(0, 4);
+    DEBUG_PRINT("Countrycode: " + (String)countryCode);
+    
+    // To handle un-initialized EEPROM memory. If we find char array starting with 
+    // Finnish country code it is most propably a valid number and not some gibberish
+    if (!countryCode.equals("+358"))
+    {
+      DEBUG_PRINT("countryCode true when index " + String(i));
+      strcpy(authorizedNumbers[i], phonenumber);
+      EEPROM.put(0, authorizedNumbers);
+      DEBUG_PRINT("Phonenumber was saved to index " + (String)i);
+      return true;
+    }
+  }
+  DEBUG_PRINT("Phonebook full. Number was not saved");
+  return false;
+}
+
+/**
+  Check if phoneNumber is int the authorized number list
+  @param char phonenumber[14] Phonenumber to be checked
+  @return true if number is authorized. Otherwise false.
+*/
+bool isPhonenumberOnTheList(String phonenumber)
+{
+  for (int i = 0; i < 10; i++)
+  {
+    String tempStr = authorizedNumbers[i];
+    if (tempStr.equals(phonenumber))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+  Fills phonebook in the EEPROM with zeroes
+*/
+void clearEEPROM()
+{
+  char emptyArray[10][14];
+  for (int i = 0; i < 10; i++)
+  {
+    for (int j = 0; j < 14; j++)
+    {
+      emptyArray[i][j] = 0;
+    }
+  }
+  EEPROM.put(0, emptyArray);
 }
