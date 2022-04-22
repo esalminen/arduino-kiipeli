@@ -86,6 +86,24 @@ JoystickInputs Joystick::readInputs()
       _joystickInputs.up = false;
     }
   }
+    // Copy inputs to byte bit by bit
+  bitWrite(inputs, 0, _joystickInputs.up);
+  bitWrite(inputs, 1, _joystickInputs.down);
+  bitWrite(inputs, 2, _joystickInputs.left);
+  bitWrite(inputs, 3, _joystickInputs.right);
+  bitWrite(inputs, 4, _joystickInputs.buttonPressed);  
 
-  return _joystickInputs;
+  // Make AND operation with prev complement to detect positive change in inputs for 1 cycle
+  pulseInputs = inputs & ~prevInputs;
+
+  // Copy pulse input bits to return inputs struct
+  _returnInputs.up = bitRead(pulseInputs, 0);
+  _returnInputs.down = bitRead(pulseInputs, 1);
+  _returnInputs.left = bitRead(pulseInputs, 2);
+  _returnInputs.right = bitRead(pulseInputs, 3);
+  _returnInputs.buttonPressed = bitRead(pulseInputs, 4);
+
+  // Copy joystick inputs to memory
+  prevInputs = inputs;
+  return _returnInputs;
 }
