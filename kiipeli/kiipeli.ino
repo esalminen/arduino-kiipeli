@@ -16,10 +16,28 @@
 // Data structure for authorized numbers
 char authorizedNumbers[10][14];
 
+// Data structure for key drops. Number and timestamp is saved
+char keyDropEvents[10][32];
+
 // LCD display
 const uint8_t rs = 12, en = 13, d4 = 5, d5 = 6, d6 = 7, d7 = 8, contrast = 3;
 const uint8_t contrastSetting = 125;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+// LCD Menu
+enum Menu 
+{
+  Wait_0,
+  SavedNumbers_1,
+  BrowseNumber_1_1,
+  KeyDrops_2,
+  BrowseKeyDrops_2_1,
+  Testing_3,
+  JoystickTest_3_1  
+};
+
+Menu menu = Wait_0;
+uint8_t menuIndex = 0;
 
 // RGB led
 const uint8_t ledRedPin = 9, ledGreenPin = 10, ledBluePin = 11;
@@ -150,6 +168,72 @@ void loop() {
     }
   }
 #endif
+
+  // LCD Menu
+  switch(menu)
+  {
+    case Wait_0:
+      lcd.clear();
+      if(joystickInputs.buttonPressed) menu = SavedNumbers_1;
+      break;
+      
+    case SavedNumbers_1:     
+      lcd.clear();
+      lcd.print("1. Saved numbers");
+      if(joystickInputs.up) menu = Testing_3;
+      if(joystickInputs.down) menu = KeyDrops_2;
+      if(joystickInputs.right) menu = BrowseNumber_1_1;
+      if(joystickInputs.left) menu = Wait_0;
+      break;
+      
+    case BrowseNumber_1_1:
+      lcd.clear();
+      lcd.print("U/D browse L <-");
+      lcd.setCursor(0,1);
+      lcd.print(menuIndex + 1);
+      lcd.print(":");
+      lcd.print(authorizedNumbers[menuIndex]);
+      if(joystickInputs.up)
+      {
+        if(menuIndex == 0) menuIndex = 9;
+        else menuIndex--;
+      };
+      if(joystickInputs.down)
+      {
+        if(menuIndex == 9) menuIndex = 0;
+        else menuIndex++;
+      };
+      if(joystickInputs.left) menu = SavedNumbers_1;
+      break;
+      
+    case KeyDrops_2:
+      lcd.clear();
+      lcd.print("2. Keydrops");
+      if(joystickInputs.up) menu = SavedNumbers_1;
+      if(joystickInputs.down) menu = Testing_3;
+      if(joystickInputs.left) menu = Wait_0;
+      break;
+      
+    case BrowseKeyDrops_2_1:
+      lcd.clear();
+      lcd.print("");
+      break;
+      
+    case Testing_3:
+      lcd.clear();
+      lcd.print("3. Testing");
+      if(joystickInputs.up) menu = KeyDrops_2;
+      if(joystickInputs.down) menu = SavedNumbers_1;
+      if(joystickInputs.left) menu = Wait_0;
+      break;
+      
+    case JoystickTest_3_1:
+      lcd.clear();
+      lcd.print("");
+      break;
+    default:
+      break; 
+  }
 
   // Check sim messages
   updateSimSerial();
