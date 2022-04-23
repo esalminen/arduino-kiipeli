@@ -18,7 +18,10 @@ A proper delivery path must be installed between Kiipeli and outside of the hous
 * Opto-relay
 * Solenoid
 
-## Authors
+## Wiring diagram
+[Kiipeli_wiring_diagram](https://user-images.githubusercontent.com/49938344/164885777-150c7f17-8b95-4020-8190-c3e1361135d6.jpg)
+
+## Authors!
 
 OAMK TVT22KMO Group 7
 
