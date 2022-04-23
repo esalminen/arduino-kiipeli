@@ -43,6 +43,7 @@ String textSms = "";
 String openKeySmsCmd = "Kiipeli";
 String registerKeyCmd = "abc123";
 String clearEEPROMCmd = "clrEEPROM";
+String resetArduinoCmd = "rstKiipeli";
 
 // Case flags
 bool messageArrived = false;
@@ -104,7 +105,7 @@ void setup() {
     updateSimSerial();
     testResult = simRead.substring(simRead.length() - 4, simRead.length() - 2);
   }
-  
+
   lcd.print(" " + testResult);
   testResult = "";
   delay(1000);
@@ -136,11 +137,17 @@ void setup() {
   messageArrived = false;
 }
 
+/*
+   Arduino software reset function
+*/
+void(* resetFunc) (void) = 0;
+
 void loop() {
   // Read joystick inputs
   joystickInputs = joystick.readInputs();
 
   // Debugging commands to sim from serial
+  // TODO: simulate sms from serial
 #ifdef DEBUG
   if (Serial.available())
   {
@@ -233,22 +240,45 @@ void handleParsedMessage()
   lcd.setCursor(0, 1);
   lcd.print(textSms);
 
+  // Add number to authorized number list
   if (textSms.equals(registerKeyCmd))
   {
     char number[14];
     numberSms.toCharArray(number, 14);
     authorizeNumberSms = addPhonenumberToList(number);
   }
-  else if (isPhonenumberOnTheList(numberSms) && textSms.equals(openKeySmsCmd))
+  // Drop key
+  else if ((checkPhonenumberOnTheList(numberSms) == -1) && textSms.equals(openKeySmsCmd))
   {
+    DEBUG_PRINT("Dropping key");
     openSesame = true;
   }
-  else if (isPhonenumberOnTheList(numberSms) && textSms.equals(clearEEPROMCmd))
+  // Clear EEPROM
+  else if ((checkPhonenumberOnTheList(numberSms) == -1) && textSms.equals(clearEEPROMCmd))
   {
+    DEBUG_PRINT("Clearing EEPROM and authorized number list");
     clearEEPROM();
+    EEPROM.get(0, authorizedNumbers); // update zeroes to list too
   }
+  // Reset Arduino
+  else if ((checkPhonenumberOnTheList(numberSms) == -1) && textSms.equals(resetArduinoCmd))
+  {
+    DEBUG_PRINT("Resetting Arduino in 5...");
+    delay(1000);
+    DEBUG_PRINT("Resetting Arduino in 4...");
+    delay(1000);
+    DEBUG_PRINT("Resetting Arduino in 3...");
+    delay(1000);
+    DEBUG_PRINT("Resetting Arduino in 2...");
+    delay(1000);
+    DEBUG_PRINT("Resetting Arduino in 1...");
+    delay(1000);
+    resetFunc();
+  }
+  // Otherwise unauthorized sms
   else if (!authorizeNumberSms)
   {
+    DEBUG_PRINT("Unauthorized sms detected");
     unauthorizedSms = true;
   }
 }
@@ -270,15 +300,12 @@ void handleFlag(bool &flag, int ledColor)
     {
       case 1:
         led.flash(RGBLed::GREEN, 100, 100);
-        DEBUG_PRINT("Led green");
         break;
       case 2:
         led.flash(RGBLed::YELLOW, 100, 100);
-        DEBUG_PRINT("Led yellow");
         break;
       case 3:
         led.flash(RGBLed::RED, 100, 100);
-        DEBUG_PRINT("Led red");
         break;
       default:
         break;
@@ -301,45 +328,43 @@ void handleFlag(bool &flag, int ledColor)
 */
 bool addPhonenumberToList(char phonenumber[14])
 {
-  if (isPhonenumberOnTheList((String)phonenumber))
+  int result = checkPhonenumberOnTheList((String)phonenumber);
+  if (result == -1)
   {
     DEBUG_PRINT("Phonenumber " + (String)phonenumber + " was on the list. Not saved.");
     return true;
   }
-  for (int i = 0; i < 10; i++)
+  else if (result == -2)
   {
-    String tempStr = authorizedNumbers[i];
-    String countryCode = tempStr.substring(0, 4);
-    DEBUG_PRINT("Countrycode: " + (String)countryCode);
-    if (!countryCode.equals("+358"))
-    {
-      DEBUG_PRINT("countryCode true when index " + String(i));
-      strcpy(authorizedNumbers[i], phonenumber);
-      EEPROM.put(0, authorizedNumbers);
-      DEBUG_PRINT("Phonenumber was saved to index " + (String)i);
-      return true;
-    }
+    DEBUG_PRINT("Phonebook full. Number was not saved");
+    return false;
   }
-  DEBUG_PRINT("Phonebook full. Number was not saved");
-  return false;
+  else
+  {
+    strcpy(authorizedNumbers[result], phonenumber);
+    EEPROM.put(0, authorizedNumbers);
+    DEBUG_PRINT("Phonenumber was saved to index " + (String)result);
+    return true;
+  }
 }
 
 /**
-  Check if phoneNumber is int the authorized number list
-  @param char phonenumber[14] Phonenumber to be checked
-  @return true if number is authorized. Otherwise false.
+  Check if phoneNumber is in the authorized number list
+  @param String phonenumber to be checked
+  @return -1 if number is on the list. -2 if list is full. Otherwise return next free index where to store number
 */
-bool isPhonenumberOnTheList(String phonenumber)
+int checkPhonenumberOnTheList(String phonenumber)
 {
   for (int i = 0; i < 10; i++)
   {
     String tempStr = authorizedNumbers[i];
     if (tempStr.equals(phonenumber))
     {
-      return true;
+      return -1;
     }
+    else if (!tempStr.substring(0, 4).equals("+358")) return i;
   }
-  return false;
+  return -2;
 }
 
 /**
