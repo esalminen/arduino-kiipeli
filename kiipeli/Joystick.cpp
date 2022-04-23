@@ -96,12 +96,19 @@ JoystickInputs Joystick::readInputs()
   // Make AND operation with prev complement to detect positive change in inputs for 1 cycle
   pulseInputs = inputs & ~prevInputs;
 
+  // Copy input bits to return inputs struct
+  _returnInputs.up = _joystickInputs.up;
+  _returnInputs.down = _joystickInputs.down;
+  _returnInputs.left = _joystickInputs.left;
+  _returnInputs.right = _joystickInputs.right;
+  _returnInputs.buttonPressed = _joystickInputs.buttonPressed;
+
   // Copy pulse input bits to return inputs struct
-  _returnInputs.up = bitRead(pulseInputs, 0);
-  _returnInputs.down = bitRead(pulseInputs, 1);
-  _returnInputs.left = bitRead(pulseInputs, 2);
-  _returnInputs.right = bitRead(pulseInputs, 3);
-  _returnInputs.buttonPressed = bitRead(pulseInputs, 4);
+  _returnInputs.upPulse = bitRead(pulseInputs, 0);
+  _returnInputs.downPulse = bitRead(pulseInputs, 1);
+  _returnInputs.leftPulse = bitRead(pulseInputs, 2);
+  _returnInputs.rightPulse = bitRead(pulseInputs, 3);
+  _returnInputs.buttonPressedPulse = bitRead(pulseInputs, 4);
 
   // Copy joystick inputs to memory
   prevInputs = inputs;

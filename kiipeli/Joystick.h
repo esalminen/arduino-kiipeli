@@ -9,6 +9,7 @@
 #include "Arduino.h"
 
 struct JoystickInputs {
+  bool upPulse = false, downPulse = false, leftPulse = false, rightPulse = false, buttonPressedPulse = false;
   bool up = false, down = false, left = false, right = false, buttonPressed = false;
 };
 
