@@ -63,10 +63,10 @@ void setup() {
   // Activate serial transmitting in debug mode
 #ifdef DEBUG
   Serial.begin(9600);
-  DEBUG_PRINT("Authorized numbers list:");
+  Serial.println("Authorized numbers list:");
   for (int i = 0; i < 10; i++)
   {
-    DEBUG_PRINT(authorizedNumbers[i]);
+    Serial.println(authorizedNumbers[i]);
   }
 #endif
 
@@ -240,28 +240,25 @@ void handleParsedMessage()
   lcd.setCursor(0, 1);
   lcd.print(textSms);
 
-  // Add number to authorized number list
-  if (textSms.equals(registerKeyCmd))
-  {
-    char number[14];
-    numberSms.toCharArray(number, 14);
-    authorizeNumberSms = addPhonenumberToList(number);
-  }
+
+  // Check if sender number is in authorized list
+  int checkResult = checkPhonenumberOnTheList(numberSms);
+  
   // Drop key
-  else if ((checkPhonenumberOnTheList(numberSms) == -1) && textSms.equals(openKeySmsCmd))
+  if ((checkResult == -1) && textSms.equals(openKeySmsCmd))
   {
     DEBUG_PRINT("Dropping key");
     openSesame = true;
   }
   // Clear EEPROM
-  else if ((checkPhonenumberOnTheList(numberSms) == -1) && textSms.equals(clearEEPROMCmd))
+  else if ((checkResult == -1) && textSms.equals(clearEEPROMCmd))
   {
     DEBUG_PRINT("Clearing EEPROM and authorized number list");
     clearEEPROM();
     EEPROM.get(0, authorizedNumbers); // update zeroes to list too
   }
   // Reset Arduino
-  else if ((checkPhonenumberOnTheList(numberSms) == -1) && textSms.equals(resetArduinoCmd))
+  else if ((checkResult == -1) && textSms.equals(resetArduinoCmd))
   {
     DEBUG_PRINT("Resetting Arduino in 5...");
     delay(1000);
@@ -275,8 +272,15 @@ void handleParsedMessage()
     delay(1000);
     resetFunc();
   }
+  // Add number to authorized number list
+  else if (textSms.equals(registerKeyCmd))
+  {
+    char number[14];
+    numberSms.toCharArray(number, 14);
+    authorizeNumberSms = addPhonenumberToList(number, checkResult);
+  }   
   // Otherwise unauthorized sms
-  else if (!authorizeNumberSms)
+  else
   {
     DEBUG_PRINT("Unauthorized sms detected");
     unauthorizedSms = true;
@@ -324,17 +328,17 @@ void handleFlag(bool &flag, int ledColor)
 /**
   Saves phonenumber to EEPROM
   @param char phonenumber[14] Phonenumber to be saved in EEPROM
+  @param int checkResult from checkPhonenumberOnTheList function
   @return true if number was saved to EEPROM or is already on the EEPROM.
 */
-bool addPhonenumberToList(char phonenumber[14])
+bool addPhonenumberToList(char phonenumber[14], int checkResult)
 {
-  int result = checkPhonenumberOnTheList((String)phonenumber);
-  if (result == -1)
+  if (checkResult == -1)
   {
     DEBUG_PRINT("Phonenumber " + (String)phonenumber + " was on the list. Not saved.");
     return true;
   }
-  else if (result == -2)
+  else if (checkResult == -2)
   {
     DEBUG_PRINT("Phonebook full. Number was not saved");
     return false;
