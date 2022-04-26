@@ -147,7 +147,6 @@ void loop() {
   joystickInputs = joystick.readInputs();
 
   // Debugging commands to sim from serial
-  // TODO: simulate sms from serial
 #ifdef DEBUG
   if (Serial.available())
   {
@@ -261,14 +260,24 @@ void handleParsedMessage()
   else if ((checkResult == -1) && textSms.equals(resetArduinoCmd))
   {
     DEBUG_PRINT("Resetting Arduino in 5...");
+    lcd.clear();
+    lcd.print("Reset in 5...");
     delay(1000);
     DEBUG_PRINT("Resetting Arduino in 4...");
+    lcd.clear();
+    lcd.print("Reset in 4...");
     delay(1000);
     DEBUG_PRINT("Resetting Arduino in 3...");
+    lcd.clear();
+    lcd.print("Reset in 3...");
     delay(1000);
     DEBUG_PRINT("Resetting Arduino in 2...");
+    lcd.clear();
+    lcd.print("Reset in 2...");
     delay(1000);
     DEBUG_PRINT("Resetting Arduino in 1...");
+    lcd.clear();
+    lcd.print("Reset in 1...");
     delay(1000);
     resetFunc();
   }
