@@ -23,6 +23,11 @@ A proper key delivery path (frame has 32 mm fit for round pipe) must be installe
 ## Authors
 
 OAMK TVT22KMO Group 7
+* [Anssi Kulotie](https://www.linkedin.com/in/anssi-kulotie-659a6021a/)
+* [Esa Salminen](https://www.linkedin.com/in/esa-salminen-9398421ba/)
+* [Janika Savela]
+* [Miikka Tyvelä](https://www.linkedin.com/in/miikka-tyvel%C3%A4-090366225/)
+* [Hannu Väliahde]
 
 ## Version History
 
