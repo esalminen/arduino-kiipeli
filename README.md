@@ -28,13 +28,3 @@ OAMK TVT22KMO Group 7
 * Janika Savela
 * [Miikka Tyvelä](https://www.linkedin.com/in/miikka-tyvel%C3%A4-090366225/)
 * Hannu Väliahde
-
-## Version History
-
-* 0.1
-    * Initial Release
-
-## Acknowledgments
-
-Inspiration, code snippets, etc.
-* [RGBLed library for Arduino](https://github.com/wilmouths/RGBLed)
