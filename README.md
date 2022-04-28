@@ -7,6 +7,8 @@ Kiipeli is a Arduino controlled spare key holder device for OAMK software course
 Kiipeli holds spare key to your house, summer cottage or similar place. When spare key is needed, user sends a predefined sms code from authorized phone number to Kiipeli. Sms is then checked and controller releases spare key to sms sender. Device is located inside the house to prevent spare key being stolen.
 A proper key delivery path (frame has 32 mm fit for round pipe) must be installed between Kiipeli and outside of the house.
 
+![3D Model of Kiiepli](/images/kiipeli.png)
+
 ## Components of Kiipeli
 
 * Arduino Uno - microcontroller
