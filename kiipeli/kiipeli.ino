@@ -18,7 +18,7 @@ char authorizedNumbers[10][14];
 
 // LCD display
 const uint8_t rs = 12, en = 13, d4 = 5, d5 = 6, d6 = 7, d7 = 8, contrast = 3;
-const uint8_t contrastSetting = 125;
+const uint8_t contrastSetting = 130;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // RGB led
@@ -28,6 +28,9 @@ RGBLed led(ledRedPin, ledGreenPin, ledBluePin, RGBLed::COMMON_CATHODE);
 // Sim800L
 const uint8_t rx = 2, tx = 4;
 SoftwareSerial sim(rx, tx);
+
+// Solenoid
+const int solenoidPin = A3;
 
 // Joystick
 JoystickInputs joystickInputs;
@@ -135,6 +138,7 @@ void setup() {
 
   // Reset messagearrived-flag from init messages
   messageArrived = false;
+  DEBUG_PRINT("Setup finished");
 }
 
 /*
@@ -164,6 +168,11 @@ void loop() {
   if (openSesame) handleFlag(openSesame, 1);
   if (authorizeNumberSms) handleFlag(authorizeNumberSms, 2);
   if (unauthorizedSms) handleFlag(unauthorizedSms, 3);
+
+  // Control solenoid
+  int solenoidPinOutput = openSesame ? 255 : 0;
+  analogWrite(solenoidPin, solenoidPinOutput);
+  
   delay(20);
 }
 
@@ -180,6 +189,7 @@ void updateSimSerial()
       simRead += (char)sim.read();
     }
     DEBUG_PRINT(simRead);
+    if(simRead.length() < 5) return;
     messageArrived = true;
   }
 }
@@ -221,6 +231,7 @@ void parseMessage()
 
   // Copy remaining string without last two cr + lf chars
   textSms = tempStr.substring(0, tempStr.length() - 2);
+  textSms.trim();
   DEBUG_PRINT("sms: " + textSms);
 
   // Turn flags accordingly
@@ -242,6 +253,7 @@ void handleParsedMessage()
 
   // Check if sender number is in authorized list
   int checkResult = checkPhonenumberOnTheList(numberSms);
+  DEBUG_PRINT("Numeron check result: " + (String)checkResult);
   
   // Drop key
   if ((checkResult == -1) && textSms.equals(openKeySmsCmd))
@@ -255,6 +267,7 @@ void handleParsedMessage()
     DEBUG_PRINT("Clearing EEPROM and authorized number list");
     clearEEPROM();
     EEPROM.get(0, authorizedNumbers); // update zeroes to list too
+    DEBUG_PRINT("EEPROM and authorized number list cleared");
   }
   // Reset Arduino
   else if ((checkResult == -1) && textSms.equals(resetArduinoCmd))
@@ -354,9 +367,9 @@ bool addPhonenumberToList(char phonenumber[14], int checkResult)
   }
   else
   {
-    strcpy(authorizedNumbers[result], phonenumber);
+    strcpy(authorizedNumbers[checkResult], phonenumber);
     EEPROM.put(0, authorizedNumbers);
-    DEBUG_PRINT("Phonenumber was saved to index " + (String)result);
+    DEBUG_PRINT("Phonenumber was saved to index " + (String)checkResult);
     return true;
   }
 }
