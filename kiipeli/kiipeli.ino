@@ -328,7 +328,7 @@ void handleFlag(bool &flag, int ledColor)
         led.flash(RGBLed::GREEN, 100, 100);
         break;
       case 2:
-        led.flash(RGBLed::YELLOW, 100, 100);
+        led.flash(RGBLed::BLUE, 100, 100);
         break;
       case 3:
         led.flash(RGBLed::RED, 100, 100);
